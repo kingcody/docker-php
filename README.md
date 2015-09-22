@@ -7,10 +7,7 @@ If you have any improvements please submit a pull request.
 ### Docker hub repository
 The Docker hub build can be found here: [https://registry.hub.docker.com/u/kingcody/nginx-php/](https://registry.hub.docker.com/u/kingcody/nginx-php/)
 
-## Nginx Versions
-- Mainline Version: **1.9.4**
-- Stable Version: **1.8.0**
-- *Latest = Mainline Version*
+### Nginx Version: 1.9.4
 
 ## Installation
 Pull the image from the docker index rather than downloading the git repo. This prevents you having to build the image on every docker host.
