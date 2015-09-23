@@ -1,84 +1,64 @@
-FROM nginx:1.9
+FROM php:fpm
 MAINTAINER Cody Mize <docker@codymize.com>
 
-# Let the conatiner know that there is no tty
-ENV DEBIAN_FRONTEND noninteractive
+# Add nginx mainline repo
+RUN curl -sSL http://nginx.org/keys/nginx_signing.key | apt-key add - && \
+    echo "deb http://nginx.org/packages/mainline/debian/ jessie nginx" >> /etc/apt/sources.list
 
-# Surpress Upstart errors/warning
-RUN dpkg-divert --local --rename --add /sbin/initctl && \
-    ln -sf /bin/true /sbin/initctl
+# Versions
+ENV NGINX_VERSION=1.9.5-1~jessie \
+    DOCKERIZE_VERSION=0.0.2
 
-# Install php5-fpm and related dependencies
+# Set env defaults
+ENV MAX_UPLOAD=100M
+
 RUN apt-get update && \
     apt-get install -y \
-      php-apc \
-      php5-curl \
-      php5-fpm \
-      php5-gd \
-      php5-intl \
-      php5-json \
-      php5-mcrypt \
-      php5-memcache \
-      php5-mongo \
-      php5-mysql \
-      php5-pgsql \
-      php5-sqlite \
-      php5-tidy \
-      php5-xmlrpc \
-      php5-xsl \
-      supervisor && \
+      nginx=${NGINX_VERSION} \
+      supervisor \
+      zip && \
     apt-get clean && \
-    apt-get autoclean && \
-    echo -n > /var/lib/apt/extended_states && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf /usr/share/man/{??,??_*}
 
-# tweak nginx config
+# Install composer and dockerize
+RUN curl -sSL https://getcomposer.org/installer | php && \
+    mv composer.phar /usr/local/bin/composer && \
+    curl -sSL "https://github.com/jwilder/dockerize/releases/download/v${DOCKERIZE_VERSION}/dockerize-linux-amd64-v${DOCKERIZE_VERSION}.tar.gz" | \
+    tar -xzC /usr/local/bin
+
+# Setup nginx config
 RUN sed -r -e 's/^(\s*)(user) .*$/\1\2 www-data;/' \
-        -e 's/^(\s*)(worker_processes) .*$/\1\2 5;/' \
+        -e 's/^(\s*)(worker_processes) .*$/\1\2 {{ .Env.NGINX_WORKERS }};/' \
         -e 's/^(\s*)(keepalive_timeout) .*$/\1\2 2;/' \
-        -e 's/^(\s*)(keepalive_timeout .*)$/\1\2\n\1client_max_body_size 100m;/' \
-        -e 's~^(\s*)(include /etc/nginx/conf\.d/\*\.conf)~\1\2;\n\1include /etc/nginx/sites-enabled/*~' \
-        -i /etc/nginx/nginx.conf && \
-    printf '\ndaemon off;\n' >> /etc/nginx/nginx.conf
+        -e 's/^(\s*)(keepalive_timeout .*)$/\1\2\n\1client_max_body_size {{ .Env.MAX_UPLOAD }};/' \
+        -i /etc/nginx/nginx.conf
 
-# tweak php-fpm config
-RUN sed -r -e 's/;?(cgi.fix_pathinfo).*$/\1 = 0/g' \
-        -e 's/;?(upload_max_filesize).*$/\1 = 100M/g' \
-        -e 's/;?(post_max_size).*$/\1 = 100M/g' \
-        -i /etc/php5/fpm/php.ini && \
-    sed -r -e 's/^;?(daemonize).*$/\1 = no/g' \
-        -i /etc/php5/fpm/php-fpm.conf && \
-    sed -r -e 's/^;?(listen.mode).*?$/\1 = 0750/g' \
-        -e 's/^;?(catch_workers_output).*$/\1 = yes/g' \
-        -e 's/^;?(pm.max_children).*$/\1 = 9/g' \
-        -e 's/^;?(pm.start_servers).*$/\1 = 3/g' \
-        -e 's/^;?(pm.min_spare_servers).*$/\1 = 2/g' \
-        -e 's/^;?(pm.max_spare_servers).*$/\1 = 4/g' \
-        -e 's/^;?(pm.max_requests).*$/\1 = 200/g' \
-        -i /etc/php5/fpm/pool.d/www.conf
+# Setup php config
+COPY php.ini /usr/local/etc/php/
+COPY php-fpm.conf /usr/local/etc/
 
-# forward php-fpm logs to docker log collector
-RUN ln -sf /dev/stdout /var/log/php5-fpm.log
+# forward request and error logs to docker log collector
+RUN ln -sf /dev/stdout /var/log/nginx/access.log && \
+    ln -sf /dev/stderr /var/log/nginx/error.log && \
+    ln -sf /dev/stdout /var/log/php5-fpm.log
 
-# nginx site conf
-RUN rm -rf /etc/nginx/conf.d/* && \
-    mkdir -p /etc/nginx/ssl/ /etc/nginx/sites-available /etc/nginx/sites-enabled && \
-    ln -sf /etc/nginx/sites-available/default.conf /etc/nginx/sites-enabled/default.conf
-COPY nginx-site.conf /etc/nginx/sites-available/default.conf
+VOLUME ["/var/cache/nginx"]
 
-# add test PHP file
-RUN echo '<?php phpinfo(); ?>' > /usr/share/nginx/html/index.php && \
-    chown -Rf www-data:www-data /usr/share/nginx/html/
+# Setup default site
+COPY nginx-site.conf /etc/nginx/conf.d/default.conf
+RUN echo '<?php phpinfo(); ?>' > /var/www/html/index.php && \
+    chown -Rf www-data:www-data /var/www/html/
 
 # Supervisor Config
-COPY supervisord.conf /etc/supervisor/
+COPY supervisor /etc/supervisor
 
-# Start Supervisord
-COPY start.sh /
-RUN chmod +x /start.sh
+# Entrypoint with dockerize
+COPY entrypoint.sh /
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Expose Ports
 EXPOSE 80 443
 
-CMD ["/bin/bash", "/start.sh"]
+# Set supervisord as the default cmd
+CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
