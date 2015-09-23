@@ -34,33 +34,29 @@ RUN apt-get update && \
     rm -rf /usr/share/man/{??,??_*}
 
 # tweak nginx config
-RUN sed -e 's/\(user\)\s*nginx/\1 www-data/' \
-        -e 's/\(worker_processes\)\s*1/\1 5/' \
-        -e 's/\(keepalive_timeout\)\s*65/\1 2/' \
-        -e 's/\(\s*\)\(keepalive_timeout 2\)/\1\2;\n\1client_max_body_size 100m/' \
-        -e 's;\(\s*\)\(include /etc/nginx/conf\.d/\*\.conf\);\1\2\;\n\1include /etc/nginx/sites-enabled/*;' \
+RUN sed -r -e 's/^(\s*)(user) .*$/\1\2 www-data;/' \
+        -e 's/^(\s*)(worker_processes) .*$/\1\2 5;/' \
+        -e 's/^(\s*)(keepalive_timeout) .*$/\1\2 2;/' \
+        -e 's/^(\s*)(keepalive_timeout .*)$/\1\2\n\1client_max_body_size 100m;/' \
+        -e 's~^(\s*)(include /etc/nginx/conf\.d/\*\.conf)~\1\2;\n\1include /etc/nginx/sites-enabled/*~' \
         -i /etc/nginx/nginx.conf && \
     printf '\ndaemon off;\n' >> /etc/nginx/nginx.conf
 
 # tweak php-fpm config
-RUN sed -e 's/;cgi.fix_pathinfo=1/cgi.fix_pathinfo=0/g' \
-        -e 's/upload_max_filesize\s*=\s*2M/upload_max_filesize = 100M/g' \
-        -e 's/post_max_size\s*=\s*8M/post_max_size = 100M/g' \
+RUN sed -r -e 's/;?(cgi.fix_pathinfo).*$/\1 = 0/g' \
+        -e 's/;?(upload_max_filesize).*$/\1 = 100M/g' \
+        -e 's/;?(post_max_size).*$/\1 = 100M/g' \
         -i /etc/php5/fpm/php.ini && \
-    sed -e 's/;daemonize\s*=\s*yes/daemonize = no/g' \
+    sed -r -e 's/^;?(daemonize).*$/\1 = no/g' \
         -i /etc/php5/fpm/php-fpm.conf && \
-    sed -e 's/;catch_workers_output\s*=\s*yes/catch_workers_output = yes/g' \
-        -e 's/pm.max_children = 5/pm.max_children = 9/g' \
-        -e 's/pm.start_servers = 2/pm.start_servers = 3/g' \
-        -e 's/pm.min_spare_servers = 1/pm.min_spare_servers = 2/g' \
-        -e 's/pm.max_spare_servers = 3/pm.max_spare_servers = 4/g' \
-        -e 's/pm.max_requests = 500/pm.max_requests = 200/g' \
+    sed -r -e 's/^;?(listen.mode).*?$/\1 = 0750/g' \
+        -e 's/^;?(catch_workers_output).*$/\1 = yes/g' \
+        -e 's/^;?(pm.max_children).*$/\1 = 9/g' \
+        -e 's/^;?(pm.start_servers).*$/\1 = 3/g' \
+        -e 's/^;?(pm.min_spare_servers).*$/\1 = 2/g' \
+        -e 's/^;?(pm.max_spare_servers).*$/\1 = 4/g' \
+        -e 's/^;?(pm.max_requests).*$/\1 = 200/g' \
         -i /etc/php5/fpm/pool.d/www.conf
-
-# fix ownership of sock file for php-fpm
-RUN sed -e "s/;listen.mode = 0660/listen.mode = 0750/g" \
-        -i /etc/php5/fpm/pool.d/www.conf && \
-    find /etc/php5/cli/conf.d/ -name "*.ini" -exec sed -i -re 's/^(\s*)#(.*)/\1;\2/g' {} \;
 
 # forward php-fpm logs to docker log collector
 RUN ln -sf /dev/stdout /var/log/php5-fpm.log
