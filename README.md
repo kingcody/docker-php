@@ -1,11 +1,11 @@
 ## Introduction
 This is a Dockerfile to build a container image for nginx and php-fpm. The container can use environment variables to configure your web application using the templating detailed in the special features section.
 ### Git reposiory
-The source files for this project can be found here: [https://github.com/kingcody/docker-nginx-php](https://github.com/kingcody/docker-nginx-php)
+The source files for this project can be found here: [https://github.com/kingcody/docker-php](https://github.com/kingcody/docker-php)
 
 If you have any improvements please submit a pull request.
 ### Docker hub repository
-The Docker hub build can be found here: [https://registry.hub.docker.com/u/kingcody/nginx-php/](https://registry.hub.docker.com/u/kingcody/nginx-php/)
+The Docker hub build can be found here: [https://registry.hub.docker.com/u/kingcody/php/](https://registry.hub.docker.com/u/kingcody/php/)
 
 ### Nginx Version: 1.9.5
 
@@ -13,30 +13,21 @@ The Docker hub build can be found here: [https://registry.hub.docker.com/u/kingc
 Pull the image from the docker index rather than downloading the git repo. This prevents you having to build the image on every docker host.
 
 ```
-docker pull kingcody/nginx-php:latest
+docker pull kingcody/php:nginx
 ```
-To pull the Stable Version:
 
-```
-docker pull kingcody/nginx-php:stable
-```
-To pull the Mainline Version:
-
-```
-docker pull kingcody/nginx-php:mainline
-```
 ## Running
 To simply run the container:
 
 ```
-sudo docker run --name nginx -p 8080:80 -d kingcody/nginx-php
+sudo docker run --name php-nginx -p 8080:80 -d kingcody/php:nginx
 ```
 You can then browse to http://\<docker_host\>:8080 to view the default install files.
 ### Volumes
 If you want to link to your web site directory on the docker host to the container run:
 
 ```
-sudo docker run --name nginx -p 8080:80 -v /your_code_directory:/usr/share/nginx/html -d kingcody/nginx-php
+sudo docker run --name php-nginx -p 8080:80 -v /your_code_directory:/usr/share/nginx/html -d kingcody/php:nginx
 ```
 ### Linking
 Linking to containers also exposes the linked container environment variables which is useful for templating and configuring web apps.
@@ -68,7 +59,7 @@ MYSQL_PORT=tcp://172.17.0.236:3306
 To link the container launch like this:
 
 ```
-sudo docker run -p 8080:80 --link some-mysql:mysql -d kingcody/nginx-php
+sudo docker run -p 8080:80 --link some-mysql:mysql -d kingcody/php:nginx
 ```
 ### Enabling SSL or Special Nginx Configs
 As with all docker containers its possible to link resources from the host OS to the guest. This makes it really easy to link in custom nginx default config files or extra virtual hosts and SSL enabled sites. For SSL sites first create a directory somewhere such as */opt/deployname/ssl/*. In this directory drop you SSL cert and Key in. Next create a directory for your custom hosts such as  */opt/deployname/sites-enabled*. In here load your custom default.conf file which references your SSL cert and keys at the location, for example:  */etc/nginx/ssl/xxxx.key*
@@ -76,7 +67,7 @@ As with all docker containers its possible to link resources from the host OS to
 Then start your container and connect these volumes like so:
 
 ```
-sudo docker run -v /opt/deployname/ssl:/etc/nginx/ssl -v /opt/deployname/sites-enabled:/etc/nginx/sites-enabled -p 8080:80 --link some-mysql:mysql -d kingcody/nginx-php
+sudo docker run -v /opt/deployname/ssl:/etc/nginx/ssl -v /opt/deployname/sites-enabled:/etc/nginx/sites-enabled -p 8080:80 --link some-mysql:mysql -d kingcody/php:nginx
 ```
 
 ## Special Features
@@ -100,7 +91,7 @@ If you want to link to an external MySQL DB and not using linking you can pass v
 Example:
 
 ```
-sudo docker run -e 'MYSQL_HOST=host.x.y.z' -e 'MYSQL_USER=username' -e 'MYSQL_PASS=password' -p 8080:80 -d kingcody/nginx-php
+sudo docker run -e 'MYSQL_HOST=host.x.y.z' -e 'MYSQL_USER=username' -e 'MYSQL_PASS=password' -p 8080:80 -d kingcody/php:nginx
 ```
 
 This will expose the following variables that can be used to template your code.
