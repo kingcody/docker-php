@@ -11,6 +11,8 @@ ENV NGINX_VERSION=1.9.5-1~jessie \
 
 # Set env defaults
 ENV MAX_UPLOAD=100M
+ENV MAX_EXECUTION_TIME=60
+ENV MAX_INPUT_TIME=60
 
 RUN apt-get update && \
     apt-get install -y \
